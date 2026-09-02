@@ -82,6 +82,32 @@
             display: flex;
         }
 
+        /* Drop Zone */
+        .drop-zone {
+            border: 2px dashed var(--primary-color);
+            border-radius: 8px;
+            padding: 25px;
+            text-align: center;
+            background: #1a1a1a;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            margin-bottom: 15px;
+        }
+        .drop-zone:hover, .drop-zone.dragover {
+            background: #252525;
+            border-color: var(--accent-color);
+        }
+        .drop-zone p {
+            margin: 0;
+            color: #aaa;
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+        .drop-zone span {
+            color: var(--primary-color);
+            font-weight: bold;
+        }
+
         /* Form & Textarea */
         textarea {
             width: 100%;
@@ -314,14 +340,23 @@
     </div>
 
     <div class="container">
+        <!-- Tab 1: Input -->
         <div id="tab-input" class="tab-content active">
-            <div class="header-row">
-                <p>現在のMarkdownをペースト</p>
+            
+            <!-- ドラッグ＆ドロップ / ファイル選択エリア -->
+            <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+                <p>📁 <span>ファイルを選択</span> または ここにドロップ<br><small style="color:#666;">(.md / .txt ファイル対応)</small></p>
+                <input type="file" id="fileInput" accept=".md,.markdown,.txt" style="display:none;" onchange="handleFileSelect(event)">
             </div>
-            <textarea id="inputMd" placeholder="ここに既存のリストを貼り付けてください..."></textarea>
+
+            <div class="header-row">
+                <p>またはテキストを直接ペースト</p>
+            </div>
+            <textarea id="inputMd" placeholder="ここに既存のMarkdownを貼り付けることもできます..."></textarea>
             <button class="btn-main btn-primary" onclick="parseInput()">解析して次へ進む</button>
         </div>
 
+        <!-- Tab 2: Edit (Form) -->
         <div id="tab-edit" class="tab-content">
             <div class="form-container">
                 
@@ -342,6 +377,7 @@
                         <option value="NEW">＋ 新規CTFを作成</option>
                     </select>
 
+                    <!-- 新規CTF設定エリア -->
                     <div id="newCtfCard" class="new-ctf-card" style="display:none;">
                         <div class="form-group">
                             <label>新規CTF表示名</label>
@@ -364,6 +400,7 @@
                     </div>
                 </div>
 
+                <!-- 複数問題の入力コンテナ -->
                 <div id="problemsContainer"></div>
 
                 <button class="btn-outline" onclick="addProblemRow()">＋ 別の問題を追加する</button>
@@ -372,6 +409,7 @@
             <button class="btn-main" onclick="addWriteup()">追記して生成</button>
         </div>
 
+        <!-- Tab 3: Output -->
         <div id="tab-output" class="tab-content">
             <div class="header-row">
                 <p>更新後のMarkdown</p>
@@ -404,6 +442,53 @@
         
         // 初期の1問目を追加
         addProblemRow();
+
+        // ドラッグ＆ドロップ機能の実装
+        const dropZone = document.getElementById('dropZone');
+
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, preventDefaults, false);
+            document.body.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => dropZone.classList.add('dragover'), false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => dropZone.classList.remove('dragover'), false);
+        });
+
+        dropZone.addEventListener('drop', handleDrop, false);
+
+        function handleDrop(e) {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            if (files.length > 0) {
+                readFile(files[0]);
+            }
+        }
+
+        function handleFileSelect(e) {
+            const files = e.target.files;
+            if (files.length > 0) {
+                readFile(files[0]);
+            }
+        }
+
+        function readFile(file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                document.getElementById('inputMd').value = e.target.result;
+                parseInput(); // ファイル読み込み後、自動で解析して「問題追加」タブへ進む
+            };
+            reader.readAsText(file);
+        }
 
         // タブ切り替え処理
         function switchTab(tabId, btnElement) {
@@ -635,7 +720,7 @@
                 if (m) {
                     if (currentMonth && currentDay && currentCtf) {
                         const catName = m[3];
-                        categoriesSet.add(catName); // カテゴリの自動収集
+                        categoriesSet.add(catName);
                         parsedData[currentMonth][currentDay][currentCtf].chals.push({
                             name: m[1], path: m[2], cat: catName
                         });
