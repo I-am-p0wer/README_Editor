@@ -1,8 +1,11 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <!-- Icon Settings -->
+    <link rel="icon" href="favicon.ico">
+    <link rel="apple-touch-icon" href="icon.png">
     <title>CTF Writeup Editor</title>
     <style>
         :root {
@@ -82,6 +85,30 @@
         }
         .tab-content.active {
             display: flex;
+        }
+
+        /* File Upload Box */
+        .file-upload-box {
+            border: 2px dashed var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            background: #181818;
+            margin-bottom: 15px;
+            cursor: pointer;
+            transition: border-color 0.2s, background-color 0.2s;
+        }
+        .file-upload-box:hover, .file-upload-box.dragover {
+            border-color: var(--primary-color);
+            background: #222;
+        }
+        .file-upload-box p {
+            margin: 0 0 10px 0;
+            color: #aaa;
+            font-size: 0.9rem;
+        }
+        .file-upload-box input[type="file"] {
+            display: none;
         }
 
         /* Form & Textarea */
@@ -324,18 +351,24 @@
     </header>
 
     <div class="tabs">
-        <button class="tab-btn active" onclick="switchTab('tab-input', this)">1. 元データ</button>
-        <button class="tab-btn" onclick="switchTab('tab-edit', this)">2. 問題追加</button>
-        <button class="tab-btn" onclick="switchTab('tab-output', this)">3. 出力結果</button>
+        <button class="tab-btn active" onclick="switchTab('tab-input', this)">1. Raw Data</button>
+        <button class="tab-btn" onclick="switchTab('tab-edit', this)">2. Add Challenge</button>
+        <button class="tab-btn" onclick="switchTab('tab-output', this)">3. Output</button>
     </div>
 
     <div class="container">
         <div id="tab-input" class="tab-content active">
-            <div class="header-row">
-                <p>現在のMarkdownをペースト</p>
+            
+            <div class="file-upload-box" id="dropArea" onclick="document.getElementById('fileInput').click()">
+                <p id="fileLabel">📁 Drop or select a Markdown file (.md)</p>
+                <input type="file" id="fileInput" accept=".md,.txt" onchange="handleFileSelect(event)">
             </div>
-            <textarea id="inputMd" placeholder="ここに既存のリストを貼り付けてください..."></textarea>
-            <button class="btn-main btn-primary" onclick="parseInput()">解析して次へ進む</button>
+
+            <div class="header-row">
+                <p>Or paste text directly</p>
+            </div>
+            <textarea id="inputMd" placeholder="Paste existing list here..."></textarea>
+            <button class="btn-main btn-primary" onclick="parseInput()">Parse & Continue</button>
         </div>
 
         <div id="tab-edit" class="tab-content">
@@ -343,38 +376,38 @@
                 
                 <div class="form-row">
                     <div class="form-group">
-                        <label>月 (例: August)</label>
+                        <label>Month (e.g., August)</label>
                         <input type="text" id="formMonth">
                     </div>
                     <div class="form-group">
-                        <label>日 (例: 27)</label>
+                        <label>Day (e.g., 27)</label>
                         <input type="number" id="formDay">
                     </div>
                 </div>
 
                 <div class="form-group">
-                    <label>CTF名 (プラットフォーム)</label>
+                    <label>CTF Name (Platform)</label>
                     <select id="formCtfSelect" onchange="handleCtfChange()">
-                        <option value="NEW">＋ 新規CTFを作成</option>
+                        <option value="NEW">＋ Create New CTF</option>
                     </select>
 
                     <div id="newCtfCard" class="new-ctf-card" style="display:none;">
                         <div class="form-group">
-                            <label>新規CTF表示名</label>
-                            <input type="text" id="formCtfNew" placeholder="例: MyCustomCTF" oninput="onNewCtfInput()">
+                            <label>New CTF Display Name</label>
+                            <input type="text" id="formCtfNew" placeholder="e.g., MyCustomCTF" oninput="onNewCtfInput()">
                         </div>
                         <div class="form-row" style="margin-bottom:0;">
                             <div class="form-group" style="margin-bottom:0;">
-                                <label>参照ID (badge-xxx)</label>
+                                <label>Reference ID (badge-xxx)</label>
                                 <input type="text" id="formBadgeRef" placeholder="badge-myctf">
                             </div>
                             <div class="form-group" style="margin-bottom:0;">
-                                <label>バッジカラー (HEX)</label>
+                                <label>Badge Color (HEX)</label>
                                 <input type="color" id="formBadgeColor" value="#1565c0" style="height: 45px; padding: 2px;" onchange="updateBadgePreview()">
                             </div>
                         </div>
                         <div class="badge-preview">
-                            <span style="font-size:0.8rem; color:#aaa;">バッジプレビュー:</span>
+                            <span style="font-size:0.8rem; color:#aaa;">Badge Preview:</span>
                             <img id="badgePreviewImg" src="" alt="preview" style="height:20px; display:none;">
                         </div>
                     </div>
@@ -382,32 +415,36 @@
 
                 <div id="problemsContainer"></div>
 
-                <button class="btn-outline" onclick="addProblemRow()">＋ 別の問題を追加する</button>
+                <button class="btn-outline" onclick="addProblemRow()">＋ Add Another Challenge</button>
 
             </div>
-            <button class="btn-main" onclick="addWriteup()">追記して生成</button>
+            <button class="btn-main" onclick="addWriteup()">Append & Generate</button>
         </div>
 
         <div id="tab-output" class="tab-content">
             <div class="header-row">
-                <p>更新後のMarkdown</p>
+                <p>Updated Markdown</p>
                 <div class="view-toggle">
-                    <button class="view-toggle-btn active" id="btnModeText" onclick="setOutputMode('text')">テキスト</button>
-                    <button class="view-toggle-btn" id="btnModePreview" onclick="setOutputMode('preview')">プレビュー</button>
+                    <button class="view-toggle-btn active" id="btnModeText" onclick="setOutputMode('text')">Text</button>
+                    <button class="view-toggle-btn" id="btnModePreview" onclick="setOutputMode('preview')">Preview</button>
                 </div>
             </div>
             
-            <textarea id="outputMd" readonly placeholder="更新結果がここに表示されます..."></textarea>
+            <textarea id="outputMd" readonly placeholder="Updated result will appear here..."></textarea>
             <div id="previewArea" class="preview-box" style="display:none;"></div>
 
-            <button class="btn-main btn-primary" id="btnCopyMd" onclick="copyOutput('outputMd', this, 'Markdownをコピー完了！')">Markdownをコピー</button>
+            <button class="btn-main btn-primary" id="btnCopyMd" onclick="copyOutput('outputMd', this, 'Markdown copied!')">Copy Markdown</button>
 
             <div class="x-section">
                 <div class="header-row">
-                    <p>X投稿用テキスト</p>
+                    <p>X (Twitter) Post Text</p>
+                    <select id="xHeaderSelect" onchange="updateXPostHeader()" style="width: auto; padding: 4px 8px; font-size: 0.8rem;">
+                        <option value="New Writeup!" selected>New Writeup!</option>
+                        <option value="CTF Writeup!">CTF Writeup!</option>
+                    </select>
                 </div>
-                <textarea id="outputX" readonly style="height: 100px; min-height: 80px;" placeholder="今回の追加分がここに生成されます..."></textarea>
-                <button class="btn-main btn-x" id="btnCopyX" onclick="copyOutput('outputX', this, 'X投稿テキストをコピー完了！')">X投稿用テキストをコピー</button>
+                <textarea id="outputX" readonly style="height: 120px; min-height: 90px;" placeholder="Generated snippet for this update will appear here..."></textarea>
+                <button class="btn-main btn-x" id="btnCopyX" onclick="copyOutput('outputX', this, 'X post text copied!')">Copy X Post Text</button>
             </div>
         </div>
     </div>
@@ -420,17 +457,57 @@
         let categoriesSet = new Set(["Web", "Pwn", "Rev", "Crypto", "Forensics", "Misc", "Hardware", "OSINT", "Mobile", "Blockchain"]);
         let problemCount = 0;
         let lastAddedItems = [];
+        let lastAddedCtf = "";
         const MONTHS = ["December", "November", "October", "September", "August", "July", "June", "May", "April", "March", "February", "January"];
 
-        // 初期設定
+        // Initial Setup
         const now = new Date();
         document.getElementById('formMonth').value = now.toLocaleString('en-US', { month: 'long' });
         document.getElementById('formDay').value = now.getDate();
         
-        // 初期の1問目を追加
+        // Add initial 1st challenge row
         addProblemRow();
 
-        // タブ切り替え処理
+        // Drag & Drop handlers
+        const dropArea = document.getElementById('dropArea');
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropArea.addEventListener(eventName, e => {
+                e.preventDefault();
+                e.stopPropagation();
+            }, false);
+        });
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropArea.addEventListener(eventName, () => dropArea.classList.add('dragover'), false);
+        });
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropArea.addEventListener(eventName, () => dropArea.classList.remove('dragover'), false);
+        });
+        dropArea.addEventListener('drop', e => {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            if (files.length > 0) {
+                readFile(files[0]);
+            }
+        });
+
+        function handleFileSelect(e) {
+            const files = e.target.files;
+            if (files.length > 0) {
+                readFile(files[0]);
+            }
+        }
+
+        function readFile(file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                document.getElementById('inputMd').value = e.target.result;
+                document.getElementById('fileLabel').textContent = `📄 Loaded: ${file.name}`;
+                parseInput();
+            };
+            reader.readAsText(file);
+        }
+
+        // Tab switching
         function switchTab(tabId, btnElement) {
             document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
             document.getElementById(tabId).classList.add('active');
@@ -447,7 +524,7 @@
             }
         }
 
-        // 表示モード切り替え（テキスト / プレビュー）
+        // Output mode toggle (Text / Preview)
         function setOutputMode(mode) {
             const txt = document.getElementById('outputMd');
             const prev = document.getElementById('previewArea');
@@ -467,7 +544,7 @@
             }
         }
 
-        // 現在選択中のCTF名を取得
+        // Get currently selected CTF name
         function getSelectedCtfName() {
             const selectVal = document.getElementById('formCtfSelect').value;
             if (selectVal === 'NEW') {
@@ -476,7 +553,7 @@
             return selectVal;
         }
 
-        // CTFプルダウン切り替え時の処理
+        // Handle CTF select change
         function handleCtfChange() {
             const selectVal = document.getElementById('formCtfSelect').value;
             const newCard = document.getElementById('newCtfCard');
@@ -508,18 +585,18 @@
             img.style.display = 'inline';
         }
 
-        // カテゴリのドロップダウンHTML生成（アルファベット順ソート）
+        // Build category options (Alphabetical)
         function buildCategorySelectOptions() {
             let options = '';
             const sortedCategories = Array.from(categoriesSet).sort((a, b) => a.localeCompare(b, 'en', { sensitivity: 'base' }));
             sortedCategories.forEach(cat => {
                 options += `<option value="${cat}">${cat}</option>`;
             });
-            options += `<option value="NEW">＋ 新規カテゴリ</option>`;
+            options += `<option value="NEW">＋ New Category</option>`;
             return options;
         }
 
-        // カテゴリ選択変更処理
+        // Handle category selection change
         function handleCategoryChange(selectEl) {
             const customInput = selectEl.nextElementSibling;
             if (selectEl.value === 'NEW') {
@@ -530,7 +607,7 @@
             }
         }
 
-        // 入力欄の追加
+        // Add problem row
         function addProblemRow() {
             problemCount++;
             const container = document.getElementById('problemsContainer');
@@ -538,26 +615,26 @@
             const itemHTML = `
                 <div class="problem-item" id="problem-${problemCount}">
                     <div class="problem-item-header">
-                        <h3>問題 ${problemCount}</h3>
-                        ${problemCount > 1 ? `<button class="btn-remove" onclick="removeProblemRow(${problemCount})">✕ 削除</button>` : ''}
+                        <h3>Challenge ${problemCount}</h3>
+                        ${problemCount > 1 ? `<button class="btn-remove" onclick="removeProblemRow(${problemCount})">✕ Remove</button>` : ''}
                     </div>
                     <div class="form-row" style="margin-bottom: 10px;">
                         <div class="form-group" style="margin-bottom: 0;">
-                            <input type="text" class="input-subfolder" placeholder="サブフォルダ (任意: 例: web)" oninput="updatePath(this)">
+                            <input type="text" class="input-subfolder" placeholder="Subfolder (Optional: e.g., web)" oninput="updatePath(this)">
                         </div>
                         <div class="form-group" style="margin-bottom: 0;">
-                            <input type="text" class="input-chal" placeholder="問題名 (例: Meow)" oninput="updatePath(this)">
+                            <input type="text" class="input-chal" placeholder="Challenge Name (e.g., Meow)" oninput="updatePath(this)">
                         </div>
                     </div>
                     <div class="form-group" style="margin-bottom: 10px;">
-                        <input type="text" class="input-path" placeholder="ファイルパス (自動生成)">
+                        <input type="text" class="input-path" placeholder="File Path (Auto-generated)">
                     </div>
                     <div class="form-group" style="margin-bottom: 0;">
-                        <label style="font-size: 0.75rem;">カテゴリ</label>
+                        <label style="font-size: 0.75rem;">Category</label>
                         <select class="input-cat-select" onchange="handleCategoryChange(this)">
                             ${buildCategorySelectOptions()}
                         </select>
-                        <input type="text" class="input-cat-custom" placeholder="新規カテゴリ名を入力" style="display:none; margin-top:5px;">
+                        <input type="text" class="input-cat-custom" placeholder="Enter new category name" style="display:none; margin-top:5px;">
                     </div>
                 </div>
             `;
@@ -569,7 +646,7 @@
             if (item) item.remove();
         }
 
-        // 全問題カードのカテゴリ選択肢を一括更新
+        // Refresh all category select options
         function refreshAllCategorySelects() {
             document.querySelectorAll('.input-cat-select').forEach(selectEl => {
                 const currentVal = selectEl.value;
@@ -580,7 +657,7 @@
             });
         }
 
-        // パスの自動生成（単一）
+        // Single path update
         function updatePath(inputElement) {
             const item = inputElement.closest('.problem-item');
             const ctf = getSelectedCtfName().replace(/\s+/g, '_');
@@ -598,14 +675,14 @@
             }
         }
 
-        // パスの自動生成（全体再計算）
+        // Recalculate all paths
         function updateAllPaths() {
             document.querySelectorAll('.input-chal').forEach(input => {
                 updatePath(input);
             });
         }
 
-        // Markdownのパース
+        // Parse Markdown input
         function parseInput() {
             const text = document.getElementById('inputMd').value;
             const lines = text.split('\n');
@@ -660,7 +737,7 @@
                 if (m) {
                     if (currentMonth && currentDay && currentCtf) {
                         const catName = m[3];
-                        categoriesSet.add(catName); // カテゴリの自動収集
+                        categoriesSet.add(catName);
                         parsedData[currentMonth][currentDay][currentCtf].chals.push({
                             name: m[1], path: m[2], cat: catName
                         });
@@ -675,7 +752,7 @@
                 }
             });
 
-            // セレクトボックスの更新（アルファベット順）
+            // Update CTF select dropdown
             const ctfSelect = document.getElementById('formCtfSelect');
             ctfSelect.innerHTML = '';
             
@@ -691,7 +768,7 @@
             
             const newOpt = document.createElement('option');
             newOpt.value = "NEW";
-            newOpt.textContent = "＋ 新規CTFを作成";
+            newOpt.textContent = "＋ Create New CTF";
             ctfSelect.appendChild(newOpt);
 
             if (existingCtfs.size > 0) {
@@ -705,7 +782,7 @@
             switchTab('tab-edit');
         }
 
-        // Markdown生成
+        // Generate Markdown output
         function addWriteup() {
             if (Object.keys(parsedData).length === 0 && document.getElementById('inputMd').value.trim() !== "") {
                 parseInput();
@@ -717,11 +794,11 @@
             const ctf = getSelectedCtfName();
 
             if (!month || !day || !ctf) {
-                alert("月、日、CTF名は必須です。");
+                alert("Month, Day, and CTF Name are required.");
                 return;
             }
 
-            // バッジ参照IDの特定・作成
+            // Identify or create badge reference ID
             let badgeRef = '';
             if (selectVal === 'NEW') {
                 badgeRef = document.getElementById('formBadgeRef').value.trim() || `badge-${ctf.toLowerCase().replace(/\s+/g, '')}`;
@@ -732,17 +809,18 @@
                 badgeRef = ctfToBadgeMap[ctf] || `badge-${ctf.toLowerCase().replace(/\s+/g, '')}`;
             }
 
-            // データのベース準備
+            // Prepare base data
             if (!parsedData[month]) parsedData[month] = {};
             if (!parsedData[month][day]) parsedData[month][day] = {};
             if (!parsedData[month][day][ctf]) {
                 parsedData[month][day][ctf] = { badgeRef: badgeRef, chals: [] };
             }
 
-            // 問題要素の収集
+            // Collect problems
             const problemItems = document.querySelectorAll('.problem-item');
             let hasValidProblem = false;
             lastAddedItems = [];
+            lastAddedCtf = ctf;
 
             problemItems.forEach(item => {
                 const chalName = item.querySelector('.input-chal').value.trim();
@@ -763,13 +841,13 @@
             });
 
             if (!hasValidProblem) {
-                alert("最低1つの問題名を入力してください。");
+                alert("Please enter at least one challenge name.");
                 return;
             }
 
             refreshAllCategorySelects();
             renderOutput();
-            renderXPost(month, day);
+            renderXPost();
             switchTab('tab-output');
         }
 
@@ -797,7 +875,6 @@
                     previewHtml.push(`<li><strong>${day}</strong><ul>`);
                     
                     const ctfs = parsedData[month][day];
-                    // 1. CTF名をアルファベット昇順でソート
                     const sortedCtfNames = Object.keys(ctfs).sort((a, b) => a.localeCompare(b, 'en', { sensitivity: 'base' }));
 
                     sortedCtfNames.forEach(ctfName => {
@@ -806,7 +883,6 @@
                         const badgeUrl = badges[ctfData.badgeRef] || '';
                         previewHtml.push(`<li><img src="${badgeUrl}" alt="${ctfName}"><ul>`);
 
-                        // 2. 問題名（Challenge）をアルファベット昇順でソート
                         const sortedChals = [...ctfData.chals].sort((a, b) => a.name.localeCompare(b.name, 'en', { sensitivity: 'base' }));
 
                         sortedChals.forEach(chal => {
@@ -822,7 +898,6 @@
 
             out.push("\n\n");
             
-            // 3. フッターのバッジ参照URLをアルファベット昇順で一覧生成
             const sortedBadgeRefs = Object.keys(badges).sort((a, b) => a.localeCompare(b, 'en', { sensitivity: 'base' }));
             sortedBadgeRefs.forEach(ref => {
                 out.push(`[${ref}]: ${badges[ref]}`);
@@ -832,39 +907,27 @@
             document.getElementById('previewArea').innerHTML = previewHtml.join('');
         }
 
-        // 月文字列を数字(1-12)に変換
-        function monthToNumber(monthStr) {
-            const m = monthStr.trim().toLowerCase();
-            const monthMap = {
-                january: 1, jan: 1,
-                february: 2, feb: 2,
-                march: 3, mar: 3,
-                april: 4, apr: 4,
-                may: 5,
-                june: 6, jun: 6,
-                july: 7, jul: 7,
-                august: 8, aug: 8,
-                september: 9, sep: 9, sept: 9,
-                october: 10, oct: 10,
-                november: 11, nov: 11,
-                december: 12, dec: 12
-            };
-            if (monthMap[m]) return monthMap[m];
-            const parsed = parseInt(monthStr, 10);
-            return isNaN(parsed) ? (now.getMonth() + 1) : parsed;
-        }
-
-        // X（Twitter）投稿用テキストの生成
-        function renderXPost(monthStr, dayNum) {
-            const monthNum = monthToNumber(monthStr);
-            let xText = "Writeup post!\n";
+        // Render X (Twitter) post snippet
+        function renderXPost() {
+            const headerText = document.getElementById('xHeaderSelect').value;
+            let xText = `${headerText}\n\n`;
             
+            if (lastAddedCtf) {
+                xText += `${lastAddedCtf}\n`;
+            }
+
             lastAddedItems.forEach(item => {
-                const catLower = item.cat.toLowerCase();
-                xText += `.${monthNum}${dayNum} -${catLower}\n`;
+                const catLower = item.cat.toLowerCase().replace(/[^a-z0-9_]/g, '');
+                xText += `・${item.name} - #${catLower}\n`;
             });
 
+            xText += `\n#CTF #Writeup`;
+
             document.getElementById('outputX').value = xText;
+        }
+
+        function updateXPostHeader() {
+            renderXPost();
         }
 
         async function copyOutput(targetId, btnEl, successMsg) {
@@ -874,13 +937,13 @@
 
             try {
                 await navigator.clipboard.writeText(outText);
-                btnEl.innerText = successMsg || 'コピー完了！';
+                btnEl.innerText = successMsg || 'Copied!';
                 btnEl.style.background = '#4caf50';
             } catch (err) {
                 const outArea = document.getElementById(targetId);
                 outArea.select();
                 document.execCommand('copy');
-                btnEl.innerText = successMsg || 'コピー完了！';
+                btnEl.innerText = successMsg || 'Copied!';
                 btnEl.style.background = '#4caf50';
             }
 
