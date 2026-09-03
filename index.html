@@ -15,6 +15,7 @@
             --primary-color: #2196f3;
             --primary-hover: #1976d2;
             --danger-color: #f44336;
+            --x-color: #1d9bf0;
         }
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
@@ -71,6 +72,7 @@
             min-height: 0;
             padding: 15px;
             box-sizing: border-box;
+            overflow-y: auto;
         }
         .tab-content {
             display: none;
@@ -80,32 +82,6 @@
         }
         .tab-content.active {
             display: flex;
-        }
-
-        /* Drop Zone */
-        .drop-zone {
-            border: 2px dashed var(--primary-color);
-            border-radius: 8px;
-            padding: 25px;
-            text-align: center;
-            background: #1a1a1a;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            margin-bottom: 15px;
-        }
-        .drop-zone:hover, .drop-zone.dragover {
-            background: #252525;
-            border-color: var(--accent-color);
-        }
-        .drop-zone p {
-            margin: 0;
-            color: #aaa;
-            font-size: 0.95rem;
-            line-height: 1.5;
-        }
-        .drop-zone span {
-            color: var(--primary-color);
-            font-weight: bold;
         }
 
         /* Form & Textarea */
@@ -123,6 +99,7 @@
             box-sizing: border-box;
             white-space: pre;
             margin-bottom: 15px;
+            min-height: 120px;
         }
         .form-container {
             flex: 1;
@@ -234,6 +211,12 @@
         .btn-primary:active {
             background: var(--primary-hover);
         }
+        .btn-x {
+            background: var(--x-color);
+        }
+        .btn-x:active {
+            background: #1a8cd8;
+        }
         .btn-outline {
             background: transparent;
             border: 1px dashed var(--border-color);
@@ -291,6 +274,7 @@
             margin-bottom: 15px;
             color: #e0e0e0;
             font-size: 0.95rem;
+            min-height: 120px;
         }
         .preview-box h3 {
             color: var(--accent-color);
@@ -325,6 +309,12 @@
             vertical-align: middle;
             height: 20px;
         }
+
+        .x-section {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid var(--border-color);
+        }
     </style>
 </head>
 <body>
@@ -340,23 +330,14 @@
     </div>
 
     <div class="container">
-        <!-- Tab 1: Input -->
         <div id="tab-input" class="tab-content active">
-            
-            <!-- ドラッグ＆ドロップ / ファイル選択エリア -->
-            <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
-                <p>📁 <span>ファイルを選択</span> または ここにドロップ<br><small style="color:#666;">(.md / .txt ファイル対応)</small></p>
-                <input type="file" id="fileInput" accept=".md,.markdown,.txt" style="display:none;" onchange="handleFileSelect(event)">
-            </div>
-
             <div class="header-row">
-                <p>またはテキストを直接ペースト</p>
+                <p>現在のMarkdownをペースト</p>
             </div>
-            <textarea id="inputMd" placeholder="ここに既存のMarkdownを貼り付けることもできます..."></textarea>
+            <textarea id="inputMd" placeholder="ここに既存のリストを貼り付けてください..."></textarea>
             <button class="btn-main btn-primary" onclick="parseInput()">解析して次へ進む</button>
         </div>
 
-        <!-- Tab 2: Edit (Form) -->
         <div id="tab-edit" class="tab-content">
             <div class="form-container">
                 
@@ -377,7 +358,6 @@
                         <option value="NEW">＋ 新規CTFを作成</option>
                     </select>
 
-                    <!-- 新規CTF設定エリア -->
                     <div id="newCtfCard" class="new-ctf-card" style="display:none;">
                         <div class="form-group">
                             <label>新規CTF表示名</label>
@@ -400,7 +380,6 @@
                     </div>
                 </div>
 
-                <!-- 複数問題の入力コンテナ -->
                 <div id="problemsContainer"></div>
 
                 <button class="btn-outline" onclick="addProblemRow()">＋ 別の問題を追加する</button>
@@ -409,7 +388,6 @@
             <button class="btn-main" onclick="addWriteup()">追記して生成</button>
         </div>
 
-        <!-- Tab 3: Output -->
         <div id="tab-output" class="tab-content">
             <div class="header-row">
                 <p>更新後のMarkdown</p>
@@ -422,7 +400,15 @@
             <textarea id="outputMd" readonly placeholder="更新結果がここに表示されます..."></textarea>
             <div id="previewArea" class="preview-box" style="display:none;"></div>
 
-            <button class="btn-main btn-primary" onclick="copyOutput()">クリップボードにコピー</button>
+            <button class="btn-main btn-primary" id="btnCopyMd" onclick="copyOutput('outputMd', this, 'Markdownをコピー完了！')">Markdownをコピー</button>
+
+            <div class="x-section">
+                <div class="header-row">
+                    <p>X投稿用テキスト</p>
+                </div>
+                <textarea id="outputX" readonly style="height: 100px; min-height: 80px;" placeholder="今回の追加分がここに生成されます..."></textarea>
+                <button class="btn-main btn-x" id="btnCopyX" onclick="copyOutput('outputX', this, 'X投稿テキストをコピー完了！')">X投稿用テキストをコピー</button>
+            </div>
         </div>
     </div>
 
@@ -433,6 +419,7 @@
         let existingCtfs = new Set();
         let categoriesSet = new Set(["Web", "Pwn", "Rev", "Crypto", "Forensics", "Misc", "Hardware", "OSINT", "Mobile", "Blockchain"]);
         let problemCount = 0;
+        let lastAddedItems = [];
         const MONTHS = ["December", "November", "October", "September", "August", "July", "June", "May", "April", "March", "February", "January"];
 
         // 初期設定
@@ -442,53 +429,6 @@
         
         // 初期の1問目を追加
         addProblemRow();
-
-        // ドラッグ＆ドロップ機能の実装
-        const dropZone = document.getElementById('dropZone');
-
-        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-            dropZone.addEventListener(eventName, preventDefaults, false);
-            document.body.addEventListener(eventName, preventDefaults, false);
-        });
-
-        function preventDefaults(e) {
-            e.preventDefault();
-            e.stopPropagation();
-        }
-
-        ['dragenter', 'dragover'].forEach(eventName => {
-            dropZone.addEventListener(eventName, () => dropZone.classList.add('dragover'), false);
-        });
-
-        ['dragleave', 'drop'].forEach(eventName => {
-            dropZone.addEventListener(eventName, () => dropZone.classList.remove('dragover'), false);
-        });
-
-        dropZone.addEventListener('drop', handleDrop, false);
-
-        function handleDrop(e) {
-            const dt = e.dataTransfer;
-            const files = dt.files;
-            if (files.length > 0) {
-                readFile(files[0]);
-            }
-        }
-
-        function handleFileSelect(e) {
-            const files = e.target.files;
-            if (files.length > 0) {
-                readFile(files[0]);
-            }
-        }
-
-        function readFile(file) {
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                document.getElementById('inputMd').value = e.target.result;
-                parseInput(); // ファイル読み込み後、自動で解析して「問題追加」タブへ進む
-            };
-            reader.readAsText(file);
-        }
 
         // タブ切り替え処理
         function switchTab(tabId, btnElement) {
@@ -720,7 +660,7 @@
                 if (m) {
                     if (currentMonth && currentDay && currentCtf) {
                         const catName = m[3];
-                        categoriesSet.add(catName);
+                        categoriesSet.add(catName); // カテゴリの自動収集
                         parsedData[currentMonth][currentDay][currentCtf].chals.push({
                             name: m[1], path: m[2], cat: catName
                         });
@@ -802,6 +742,7 @@
             // 問題要素の収集
             const problemItems = document.querySelectorAll('.problem-item');
             let hasValidProblem = false;
+            lastAddedItems = [];
 
             problemItems.forEach(item => {
                 const chalName = item.querySelector('.input-chal').value.trim();
@@ -816,6 +757,7 @@
 
                 if (chalName) {
                     parsedData[month][day][ctf].chals.push({ name: chalName, path: path, cat: cat });
+                    lastAddedItems.push({ name: chalName, cat: cat });
                     hasValidProblem = true;
                 }
             });
@@ -827,6 +769,7 @@
 
             refreshAllCategorySelects();
             renderOutput();
+            renderXPost(month, day);
             switchTab('tab-output');
         }
 
@@ -889,26 +832,62 @@
             document.getElementById('previewArea').innerHTML = previewHtml.join('');
         }
 
-        async function copyOutput() {
-            const outText = document.getElementById('outputMd').value;
+        // 月文字列を数字(1-12)に変換
+        function monthToNumber(monthStr) {
+            const m = monthStr.trim().toLowerCase();
+            const monthMap = {
+                january: 1, jan: 1,
+                february: 2, feb: 2,
+                march: 3, mar: 3,
+                april: 4, apr: 4,
+                may: 5,
+                june: 6, jun: 6,
+                july: 7, jul: 7,
+                august: 8, aug: 8,
+                september: 9, sep: 9, sept: 9,
+                october: 10, oct: 10,
+                november: 11, nov: 11,
+                december: 12, dec: 12
+            };
+            if (monthMap[m]) return monthMap[m];
+            const parsed = parseInt(monthStr, 10);
+            return isNaN(parsed) ? (now.getMonth() + 1) : parsed;
+        }
+
+        // X（Twitter）投稿用テキストの生成
+        function renderXPost(monthStr, dayNum) {
+            const monthNum = monthToNumber(monthStr);
+            let xText = "Writeup post!\n";
+            
+            lastAddedItems.forEach(item => {
+                const catLower = item.cat.toLowerCase();
+                xText += `.${monthNum}${dayNum} -${catLower}\n`;
+            });
+
+            document.getElementById('outputX').value = xText;
+        }
+
+        async function copyOutput(targetId, btnEl, successMsg) {
+            const outText = document.getElementById(targetId).value;
+            const originalText = btnEl.innerText;
+            const originalBg = btnEl.style.background;
+
             try {
                 await navigator.clipboard.writeText(outText);
-                
-                const btn = document.querySelector('#tab-output .btn-primary');
-                const originalText = btn.innerText;
-                btn.innerText = 'コピー完了！';
-                btn.style.background = '#4caf50';
-                
-                setTimeout(() => {
-                    btn.innerText = originalText;
-                    btn.style.background = 'var(--primary-color)';
-                }, 2000);
+                btnEl.innerText = successMsg || 'コピー完了！';
+                btnEl.style.background = '#4caf50';
             } catch (err) {
-                const outArea = document.getElementById('outputMd');
+                const outArea = document.getElementById(targetId);
                 outArea.select();
                 document.execCommand('copy');
-                alert('コピーしました！');
+                btnEl.innerText = successMsg || 'コピー完了！';
+                btnEl.style.background = '#4caf50';
             }
+
+            setTimeout(() => {
+                btnEl.innerText = originalText;
+                btnEl.style.background = originalBg;
+            }, 2000);
         }
     </script>
 </body>
