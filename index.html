@@ -3,13 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    
-    <!-- GitHub Pages用の絶対パス指定 -->
-    <link rel="icon" type="image/png" href="/README_Editor/icon.png?v=2">
-    <link rel="apple-touch-icon" href="/README_Editor/icon.png?v=2">
-    
+    <!-- Icon Settings -->
+    <link rel="icon" href="favicon.ico">
+    <link rel="apple-touch-icon" href="icon.png">
     <title>CTF Writeup Editor</title>
-
     <style>
         :root {
             --bg-color: #121212;
@@ -320,9 +317,11 @@
         .preview-box ul {
             margin: 5px 0 10px 0;
             padding-left: 20px;
+            list-style: none;
         }
         .preview-box li {
-            margin-bottom: 4px;
+            margin-bottom: 6px;
+            position: relative;
         }
         .preview-box a {
             color: var(--primary-color);
@@ -340,6 +339,54 @@
             height: 20px;
         }
 
+        /* Interactive Preview Actions */
+        .preview-item-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            padding: 2px 0;
+        }
+        .preview-item-content {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .preview-actions {
+            display: inline-flex;
+            gap: 4px;
+            opacity: 0.7;
+            transition: opacity 0.2s;
+        }
+        .preview-item-row:hover .preview-actions {
+            opacity: 1;
+        }
+        .btn-action-sm {
+            background: #2a2a2a;
+            border: 1px solid #444;
+            color: #ccc;
+            border-radius: 4px;
+            padding: 2px 6px;
+            font-size: 0.75rem;
+            cursor: pointer;
+        }
+        .btn-action-sm:hover {
+            background: #3a3a3a;
+            color: #fff;
+        }
+        .btn-action-del {
+            color: var(--danger-color);
+            border-color: #522;
+        }
+        .btn-action-del:hover {
+            background: #411;
+            color: #ff6b6b;
+        }
+
         .x-section {
             margin-top: 15px;
             padding-top: 15px;
@@ -355,7 +402,7 @@
 
     <div class="tabs">
         <button class="tab-btn active" onclick="switchTab('tab-input', this)">1. Raw Data</button>
-        <button class="tab-btn" onclick="switchTab('tab-edit', this)">2. Add Challenge</button>
+        <button class="tab-btn" onclick="switchTab('tab-edit', this)">2. Manage / Add</button>
         <button class="tab-btn" onclick="switchTab('tab-output', this)">3. Output</button>
     </div>
 
@@ -411,7 +458,7 @@
                         </div>
                         <div class="badge-preview">
                             <span style="font-size:0.8rem; color:#aaa;">Badge Preview:</span>
-                            <img id="badgePreviewImg" src="" alt="preview" style="height:20px; display:none;">
+                            <img id="badgePreviewImg" src="" alt="preview" style="display:none;">
                         </div>
                     </div>
                 </div>
@@ -421,7 +468,7 @@
                 <button class="btn-outline" onclick="addProblemRow()">＋ Add Another Challenge</button>
 
             </div>
-            <button class="btn-main" onclick="addWriteup()">Append & Generate</button>
+            <button class="btn-main" onclick="addWriteup()">Generate Updated Markdown</button>
         </div>
 
         <div id="tab-output" class="tab-content">
@@ -467,9 +514,6 @@
         const now = new Date();
         document.getElementById('formMonth').value = now.toLocaleString('en-US', { month: 'long' });
         document.getElementById('formDay').value = now.getDate();
-        
-        // Add initial 1st challenge row
-        addProblemRow();
 
         // Drag & Drop handlers
         const dropArea = document.getElementById('dropArea');
@@ -567,7 +611,7 @@
             } else {
                 newCard.style.display = 'none';
             }
-            updateAllPaths();
+            loadExistingChallengesForSelectedCtf();
         }
 
         function onNewCtfInput() {
@@ -611,26 +655,39 @@
         }
 
         // Add problem row
-        function addProblemRow() {
+        function addProblemRow(initialData = null) {
             problemCount++;
             const container = document.getElementById('problemsContainer');
             
+            const chalName = initialData ? initialData.name : '';
+            const fullPath = initialData ? initialData.path : '';
+            const cat = initialData ? initialData.cat : '';
+
+            // Extract subfolder if match format: CTF/subfolder/chal/README.md
+            let subfolder = '';
+            if (fullPath) {
+                const parts = fullPath.split('/');
+                if (parts.length === 4) {
+                    subfolder = parts[1];
+                }
+            }
+
             const itemHTML = `
                 <div class="problem-item" id="problem-${problemCount}">
                     <div class="problem-item-header">
-                        <h3>Challenge ${problemCount}</h3>
-                        ${problemCount > 1 ? `<button class="btn-remove" onclick="removeProblemRow(${problemCount})">✕ Remove</button>` : ''}
+                        <h3>Challenge</h3>
+                        <button class="btn-remove" onclick="removeProblemRow(${problemCount})">✕ Remove</button>
                     </div>
                     <div class="form-row" style="margin-bottom: 10px;">
                         <div class="form-group" style="margin-bottom: 0;">
-                            <input type="text" class="input-subfolder" placeholder="Subfolder (Optional: e.g., web)" oninput="updatePath(this)">
+                            <input type="text" class="input-subfolder" value="${subfolder}" placeholder="Subfolder (Optional: e.g., web)" oninput="updatePath(this)">
                         </div>
                         <div class="form-group" style="margin-bottom: 0;">
-                            <input type="text" class="input-chal" placeholder="Challenge Name (e.g., Meow)" oninput="updatePath(this)">
+                            <input type="text" class="input-chal" value="${chalName}" placeholder="Challenge Name (e.g., Meow)" oninput="updatePath(this)">
                         </div>
                     </div>
                     <div class="form-group" style="margin-bottom: 10px;">
-                        <input type="text" class="input-path" placeholder="File Path (Auto-generated)">
+                        <input type="text" class="input-path" value="${fullPath}" placeholder="File Path (Auto-generated)">
                     </div>
                     <div class="form-group" style="margin-bottom: 0;">
                         <label style="font-size: 0.75rem;">Category</label>
@@ -642,6 +699,21 @@
                 </div>
             `;
             container.insertAdjacentHTML('beforeend', itemHTML);
+
+            const row = document.getElementById(`problem-${problemCount}`);
+            if (cat) {
+                const selectEl = row.querySelector('.input-cat-select');
+                if (Array.from(selectEl.options).some(o => o.value === cat)) {
+                    selectEl.value = cat;
+                } else {
+                    selectEl.value = 'NEW';
+                    handleCategoryChange(selectEl);
+                    row.querySelector('.input-cat-custom').value = cat;
+                }
+            }
+            if (!fullPath) {
+                updatePath(row.querySelector('.input-chal'));
+            }
         }
 
         function removeProblemRow(id) {
@@ -683,6 +755,23 @@
             document.querySelectorAll('.input-chal').forEach(input => {
                 updatePath(input);
             });
+        }
+
+        // Load existing challenges for selected CTF/Date
+        function loadExistingChallengesForSelectedCtf() {
+            const container = document.getElementById('problemsContainer');
+            container.innerHTML = '';
+            
+            const month = document.getElementById('formMonth').value.trim();
+            const day = parseInt(document.getElementById('formDay').value.trim(), 10);
+            const ctf = getSelectedCtfName();
+
+            if (parsedData[month] && parsedData[month][day] && parsedData[month][day][ctf]) {
+                const chals = parsedData[month][day][ctf].chals;
+                chals.forEach(chal => addProblemRow(chal));
+            } else {
+                addProblemRow();
+            }
         }
 
         // Parse Markdown input
@@ -779,9 +868,9 @@
             } else {
                 ctfSelect.value = "NEW";
             }
-            handleCtfChange();
-            refreshAllCategorySelects();
 
+            refreshAllCategorySelects();
+            handleCtfChange();
             switchTab('tab-edit');
         }
 
@@ -815,13 +904,12 @@
             // Prepare base data
             if (!parsedData[month]) parsedData[month] = {};
             if (!parsedData[month][day]) parsedData[month][day] = {};
-            if (!parsedData[month][day][ctf]) {
-                parsedData[month][day][ctf] = { badgeRef: badgeRef, chals: [] };
-            }
+
+            // Reset challenges for this CTF entry (Overwrite with current form state)
+            parsedData[month][day][ctf] = { badgeRef: badgeRef, chals: [] };
 
             // Collect problems
             const problemItems = document.querySelectorAll('.problem-item');
-            let hasValidProblem = false;
             lastAddedItems = [];
             lastAddedCtf = ctf;
 
@@ -839,19 +927,77 @@
                 if (chalName) {
                     parsedData[month][day][ctf].chals.push({ name: chalName, path: path, cat: cat });
                     lastAddedItems.push({ name: chalName, cat: cat });
-                    hasValidProblem = true;
                 }
             });
 
-            if (!hasValidProblem) {
-                alert("Please enter at least one challenge name.");
-                return;
-            }
+            // Clean up empty nodes
+            cleanEmptyNodes();
 
             refreshAllCategorySelects();
             renderOutput();
             renderXPost();
             switchTab('tab-output');
+        }
+
+        function cleanEmptyNodes() {
+            Object.keys(parsedData).forEach(month => {
+                Object.keys(parsedData[month]).forEach(day => {
+                    Object.keys(parsedData[month][day]).forEach(ctf => {
+                        if (!parsedData[month][day][ctf].chals || parsedData[month][day][ctf].chals.length === 0) {
+                            delete parsedData[month][day][ctf];
+                        }
+                    });
+                    if (Object.keys(parsedData[month][day]).length === 0) {
+                        delete parsedData[month][day];
+                    }
+                });
+                if (Object.keys(parsedData[month]).length === 0) {
+                    delete parsedData[month];
+                }
+            });
+        }
+
+        // Direct item actions from Output Preview tab
+        function editCtfGroup(month, day, ctfName) {
+            document.getElementById('formMonth').value = month;
+            document.getElementById('formDay').value = day;
+
+            const ctfSelect = document.getElementById('formCtfSelect');
+            if (Array.from(ctfSelect.options).some(o => o.value === ctfName)) {
+                ctfSelect.value = ctfName;
+            } else {
+                ctfSelect.value = "NEW";
+                document.getElementById('formCtfNew').value = ctfName;
+            }
+
+            handleCtfChange();
+            switchTab('tab-edit');
+        }
+
+        function deleteCtfGroup(month, day, ctfName) {
+            if (confirm(`Delete CTF group "${ctfName}" (${month} ${day})?`)) {
+                if (parsedData[month] && parsedData[month][day] && parsedData[month][day][ctfName]) {
+                    delete parsedData[month][day][ctfName];
+                    cleanEmptyNodes();
+                    renderOutput();
+                    renderXPost();
+                }
+            }
+        }
+
+        function deleteChalItem(month, day, ctfName, chalIndex) {
+            if (parsedData[month] && parsedData[month][day] && parsedData[month][day][ctfName]) {
+                const chalList = parsedData[month][day][ctfName].chals;
+                if (chalList && chalList[chalIndex]) {
+                    const chalName = chalList[chalIndex].name;
+                    if (confirm(`Delete challenge "${chalName}"?`)) {
+                        chalList.splice(chalIndex, 1);
+                        cleanEmptyNodes();
+                        renderOutput();
+                        renderXPost();
+                    }
+                }
+            }
         }
 
         function renderOutput() {
@@ -884,13 +1030,40 @@
                         const ctfData = ctfs[ctfName];
                         out.push(`  * ![${ctfName}][${ctfData.badgeRef}]`);
                         const badgeUrl = badges[ctfData.badgeRef] || '';
-                        previewHtml.push(`<li><img src="${badgeUrl}" alt="${ctfName}"><ul>`);
+                        
+                        // CTF Header Row in Preview with Edit / Delete actions
+                        const ctfEscaped = ctfName.replace(/'/g, "\\'");
+                        const monthEscaped = month.replace(/'/g, "\\'");
+                        previewHtml.push(`<li>
+                            <div class="preview-item-row">
+                                <div class="preview-item-content">
+                                    <img src="${badgeUrl}" alt="${ctfName}">
+                                </div>
+                                <div class="preview-actions">
+                                    <button class="btn-action-sm" onclick="editCtfGroup('${monthEscaped}', ${day}, '${ctfEscaped}')">✎ Edit</button>
+                                    <button class="btn-action-sm btn-action-del" onclick="deleteCtfGroup('${monthEscaped}', ${day}, '${ctfEscaped}')">✕ Del</button>
+                                </div>
+                            </div>
+                            <ul>`);
 
-                        const sortedChals = [...ctfData.chals].sort((a, b) => a.name.localeCompare(b.name, 'en', { sensitivity: 'base' }));
+                        const sortedChals = [...ctfData.chals].sort((a, b) => a.name.localeCompare(b, 'en', { sensitivity: 'base' }));
 
                         sortedChals.forEach(chal => {
                             out.push(`    * [${chal.name}](${chal.path}) — \`${chal.cat}\``);
-                            previewHtml.push(`<li><a href="${chal.path}">${chal.name}</a> — <code>${chal.cat}</code></li>`);
+
+                            // Find original index in source array for accurate delete operation
+                            const origIdx = ctfData.chals.findIndex(c => c.name === chal.name && c.path === chal.path);
+
+                            previewHtml.push(`<li>
+                                <div class="preview-item-row">
+                                    <div class="preview-item-content">
+                                        <a href="${chal.path}">${chal.name}</a> — <code>${chal.cat}</code>
+                                    </div>
+                                    <div class="preview-actions">
+                                        <button class="btn-action-sm btn-action-del" onclick="deleteChalItem('${monthEscaped}', ${day}, '${ctfEscaped}', ${origIdx})">✕</button>
+                                    </div>
+                                </div>
+                            </li>`);
                         });
                         previewHtml.push(`</ul></li>`);
                     });
