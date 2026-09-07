@@ -392,6 +392,28 @@
             padding-top: 15px;
             border-top: 1px solid var(--border-color);
         }
+
+        /* Multi X Post Card */
+        .x-post-card {
+            background: #1a1a1a;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 15px;
+        }
+        .x-post-card-header {
+            font-size: 0.85rem;
+            color: var(--x-color);
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+        .btn-row {
+            display: flex;
+            gap: 10px;
+        }
+        .btn-row .btn-main {
+            margin-bottom: 0;
+        }
     </style>
 </head>
 <body>
@@ -487,14 +509,13 @@
 
             <div class="x-section">
                 <div class="header-row">
-                    <p>X (Twitter) Post Text</p>
-                    <select id="xHeaderSelect" onchange="updateXPostHeader()" style="width: auto; padding: 4px 8px; font-size: 0.8rem;">
+                    <p>X (Twitter) Post Texts (Separated per problem)</p>
+                    <select id="xHeaderSelect" onchange="renderXPost()" style="width: auto; padding: 4px 8px; font-size: 0.8rem;">
                         <option value="New Writeup!" selected>New Writeup!</option>
                         <option value="CTF Writeup!">CTF Writeup!</option>
                     </select>
                 </div>
-                <textarea id="outputX" readonly style="height: 120px; min-height: 90px;" placeholder="Generated snippet for this update will appear here..."></textarea>
-                <button class="btn-main btn-x" id="btnCopyX" onclick="copyOutput('outputX', this, 'X post text copied!')">Copy X Post Text</button>
+                <div id="xPostsContainer"></div>
             </div>
         </div>
     </div>
@@ -509,6 +530,7 @@
         let lastAddedItems = [];
         let lastAddedCtf = "";
         const MONTHS = ["December", "November", "October", "September", "August", "July", "June", "May", "April", "March", "February", "January"];
+        const GITHUB_BASE_URL = "https://github.com/I-am-p0wer/CTF-Writeups/blob/main";
 
         // Initial Setup
         const now = new Date();
@@ -662,6 +684,7 @@
             const chalName = initialData ? initialData.name : '';
             const fullPath = initialData ? initialData.path : '';
             const cat = initialData ? initialData.cat : '';
+            const comment = initialData ? (initialData.comment || '') : '';
 
             // Extract subfolder if match format: CTF/subfolder/chal/README.md
             let subfolder = '';
@@ -689,12 +712,18 @@
                     <div class="form-group" style="margin-bottom: 10px;">
                         <input type="text" class="input-path" value="${fullPath}" placeholder="File Path (Auto-generated)">
                     </div>
-                    <div class="form-group" style="margin-bottom: 0;">
-                        <label style="font-size: 0.75rem;">Category</label>
-                        <select class="input-cat-select" onchange="handleCategoryChange(this)">
-                            ${buildCategorySelectOptions()}
-                        </select>
-                        <input type="text" class="input-cat-custom" placeholder="Enter new category name" style="display:none; margin-top:5px;">
+                    <div class="form-row" style="margin-bottom: 0;">
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label style="font-size: 0.75rem;">Category</label>
+                            <select class="input-cat-select" onchange="handleCategoryChange(this)">
+                                ${buildCategorySelectOptions()}
+                            </select>
+                            <input type="text" class="input-cat-custom" placeholder="Enter new category name" style="display:none; margin-top:5px;">
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label style="font-size: 0.75rem;">Comment for X (Optional)</label>
+                            <input type="text" class="input-comment" value="${comment}" placeholder="Brief comment for post">
+                        </div>
                     </div>
                 </div>
             `;
@@ -916,6 +945,7 @@
             problemItems.forEach(item => {
                 const chalName = item.querySelector('.input-chal').value.trim();
                 const path = item.querySelector('.input-path').value.trim();
+                const comment = item.querySelector('.input-comment').value.trim();
                 
                 const selectCat = item.querySelector('.input-cat-select').value;
                 let cat = selectCat;
@@ -925,8 +955,8 @@
                 }
 
                 if (chalName) {
-                    parsedData[month][day][ctf].chals.push({ name: chalName, path: path, cat: cat });
-                    lastAddedItems.push({ name: chalName, cat: cat });
+                    parsedData[month][day][ctf].chals.push({ name: chalName, path: path, cat: cat, comment: comment });
+                    lastAddedItems.push({ name: chalName, path: path, cat: cat, comment: comment });
                 }
             });
 
@@ -1083,27 +1113,54 @@
             document.getElementById('previewArea').innerHTML = previewHtml.join('');
         }
 
-        // Render X (Twitter) post snippet
+        // Render X (Twitter) post snippets (Separated per problem)
         function renderXPost() {
             const headerText = document.getElementById('xHeaderSelect').value;
-            let xText = `${headerText}\n\n`;
-            
-            if (lastAddedCtf) {
-                xText += `${lastAddedCtf}\n`;
+            const container = document.getElementById('xPostsContainer');
+            container.innerHTML = '';
+
+            if (!lastAddedItems || lastAddedItems.length === 0) {
+                container.innerHTML = '<p style="color:#aaa; font-size:0.85rem;">No recently generated items.</p>';
+                return;
             }
 
-            lastAddedItems.forEach(item => {
+            lastAddedItems.forEach((item, index) => {
                 const catLower = item.cat.toLowerCase().replace(/[^a-z0-9_]/g, '');
-                xText += `・${item.name} - #${catLower}\n`;
+                const cleanPath = item.path ? item.path.replace(/^\/+/, '') : '';
+                const fullUrl = `${GITHUB_BASE_URL}/${cleanPath}`;
+                
+                let xText = `${headerText}\n\n`;
+                if (lastAddedCtf) {
+                    xText += `${lastAddedCtf}\n`;
+                }
+                xText += `・${item.name} - #${catLower}\n\n`;
+                if (item.comment) {
+                    xText += `${item.comment}\n\n`;
+                }
+                xText += `${fullUrl}\n\n#CTF #Writeup`;
+
+                const cardId = `x-card-${index}`;
+                const textId = `x-text-${index}`;
+
+                const cardHTML = `
+                    <div class="x-post-card" id="${cardId}">
+                        <div class="x-post-card-header">Post #${index + 1}: ${item.name}</div>
+                        <textarea id="${textId}" style="height: 110px; min-height: 90px; margin-bottom: 8px;">${xText}</textarea>
+                        <div class="btn-row">
+                            <button class="btn-main btn-x" onclick="copyOutput('${textId}', this, 'Copied!')">Copy Text</button>
+                            <button class="btn-main btn-primary" onclick="postToX('${textId}')">Post to X</button>
+                        </div>
+                    </div>
+                `;
+                container.insertAdjacentHTML('beforeend', cardHTML);
             });
-
-            xText += `\n#CTF #Writeup`;
-
-            document.getElementById('outputX').value = xText;
         }
 
-        function updateXPostHeader() {
-            renderXPost();
+        function postToX(textId) {
+            const text = document.getElementById(textId).value;
+            const encodedText = encodeURIComponent(text);
+            const twitterUrl = `https://twitter.com/intent/tweet?text=${encodedText}`;
+            window.open(twitterUrl, '_blank');
         }
 
         async function copyOutput(targetId, btnEl, successMsg) {
